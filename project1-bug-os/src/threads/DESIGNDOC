@@ -1,0 +1,228 @@
+            +--------------------+
+            |        CS 130      |
+            | PROJECT 1: THREADS |
+            |   DESIGN DOCUMENT  |
+            +--------------------+
+
+---- GROUP ----
+
+>> Fill in the names and email addresses of your group members.
+
+FirstName LastName <email@domain.example>
+Zhechuan Yu <arahato@shanghaitech.edu.cn>
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+https://pkuflyingpig.gitbook.io/pintos/project-description/lab1-threads/background
+https://www.cnblogs.com/laiy/p/pintos_project1_thread.html
+
+                 ALARM CLOCK
+                 ===========
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+In `thread.h':
+
+    struct thread {
+        // ...
+        int64_t thread_sleeptime;
+    };
+    - Indicates the remaining sleep time of the thread.
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+In `timer_sleep()':
+Atomically set the sleeptime of the current thread to the parameter
+`ticks', and then block it, putting it into sleep.
+
+In `timer_interrupt()':
+Check the remaining sleeptime for all threads. If it is 0,
+ remove its BLOCKED state and unblock it.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+I think it is hard to minimize the amount of time spent in the timer
+interrupt handler in my current implementation.
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+By disabling interrupts, no other thread could preempt the running
+thread or call timer_sleep() simultaneously.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+After the call to timer_sleep(), the function will then disable
+interrupts, preventing interference from the timer interrupts.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+I have an another design: do not use the sleeptime but a timestamp, then
+classify threads into several time barrels based on the value of the
+timestamp, so I don't have to thread_foreach any more.
+
+It may be a good optimization, but obviously not as convenient as the
+current implementation. 
+
+             PRIORITY SCHEDULING
+             ===================
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+>> B2: Explain the data structure used to track priority donation.
+>> Use ASCII art to diagram a nested donation.  (Alternately, submit a
+>> .png file.)
+
+---- ALGORITHMS ----
+
+>> B3: How do you ensure that the highest priority thread waiting for
+>> a lock, semaphore, or condition variable wakes up first?
+
+>> B4: Describe the sequence of events when a call to lock_acquire()
+>> causes a priority donation.  How is nested donation handled?
+
+>> B5: Describe the sequence of events when lock_release() is called
+>> on a lock that a higher-priority thread is waiting for.
+
+---- SYNCHRONIZATION ----
+
+>> B6: Describe a potential race in thread_set_priority() and explain
+>> how your implementation avoids it.  Can you use a lock to avoid
+>> this race?
+
+---- RATIONALE ----
+
+>> B7: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+              ADVANCED SCHEDULER
+              ==================
+
+---- DATA STRUCTURES ----
+
+>> C1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+In `fixed-point.h':
+
+    typedef int fpr;
+    - Used to distinguish integers and self-defined fixed-point real
+     number types
+
+
+---- ALGORITHMS ----
+
+>> C2: Suppose threads A, B, and C have nice values 0, 1, and 2.  Each
+>> has a recent_cpu value of 0.  Fill in the table below showing the
+>> scheduling decision and the priority and recent_cpu values for each
+>> thread after each given number of timer ticks:
+
+timer  recent_cpu    priority   thread
+ticks   A   B   C   A   B   C   to run
+-----  --  --  --  --  --  --   ------
+ 0      0   0   0   63  61  59  A   [B->C]
+ 4      4   0   0   62  61  59  A   [B->C]
+ 8      8   0   0   61  61  59  B   [A->C]
+12      8   4   0   61  60  59  A   [B->C]
+16      12  4   0   60  60  59  B   [A->C]
+20      12  8   0   60  59  59  A   [C->B]
+24      16  8   0   59  59  59  C   [B->A]
+28      16  8   4   59  59  58  B   [A->C]
+32      16  12  4   59  58  58  A   [C->B]
+36      20  12  4   58  58  58  C   [B->A]
+
+>> C3: Did any ambiguities in the scheduler specification make values
+>> in the table uncertain?  If so, what rule did you use to resolve
+>> them?  Does this match the behavior of your scheduler?
+
+The ambiguity is that if there are multiple threads with the highest
+priority, which one should be chosen to run, and how the readylist will
+be changed.
+Due to the details of the `thread_cmp_priority()' and `list_insert_ordered()'
+functions, the FIFO principle will be followed in the event of a tie.
+And in the `timer_interrupt()', after recalculating the priority of
+the current thread, function `intr_yield_on_return()' will be called,
+inserting current thread into the readylist.
+
+>> C4: How is the way you divided the cost of scheduling between code
+>> inside and outside interrupt context likely to affect performance?
+
+Implement necessary tick-related variable recalculation within the
+interrupt context, such as regular updates of load_avg, recent_cpu,
+and priority. And use these updated variables to reschedule outside
+the interrupt context.
+
+---- RATIONALE ----
+
+>> C5: Briefly critique your design, pointing out advantages and
+>> disadvantages in your design choices.  If you were to have extra
+>> time to work on this part of the project, how might you choose to
+>> refine or improve your design?
+
+Advantages: Simpler code.
+Disadvantages: Scheduling is less efficient for implementation convenience,
+and there is still some risk of insufficient thread_yield().
+
+We may not continue to use the priority list of part2 directly, but
+use 64 lists, which will be very clear.
+
+>> C6: The assignment explains arithmetic for fixed-point math in
+>> detail, but it leaves it open to you to implement it.  Why did you
+>> decide to implement it the way you did?  If you created an
+>> abstraction layer for fixed-point math, that is, an abstract data
+>> type and/or a set of functions or macros to manipulate fixed-point
+>> numbers, why did you do so?  If not, why not?
+
+We use macros to implement it, because fixed-point operations are
+very simple but require the use of many functions, which can be solved
+well with macros easily.
+
+               SURVEY QUESTIONS
+               ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
