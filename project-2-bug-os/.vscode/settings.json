@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "block.h": "c",
+        "syscall.h": "c",
+        "process.h": "c",
+        "thread.h": "c",
+        "interrupt.h": "c",
+        "stdio.h": "c",
+        "file.h": "c",
+        "filesys.h": "c",
+        "synch.h": "c",
+        "swap.h": "c",
+        "palloc.h": "c"
+    }
+}
